@@ -10,10 +10,8 @@
  *******************************************************/
 
 #include "solve_5pts.h"
-#include <sophus/se3.h>
-#include <sophus/so3.h>
-using Sophus::SE3;
-using Sophus::SO3;
+#include <sophus/se3.hpp>
+#include <sophus/so3.hpp>
 
 namespace cv {
     void decomposeEssentialMat( InputArray _E, OutputArray _R1, OutputArray _R2, OutputArray _t )
@@ -261,7 +259,8 @@ bool MotionEstimator::solveRelativeRT_PNP(const vector<pair<Vector3d, Vector3d>>
 
 
     Vector3d tran(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0));
-    Matrix3d rota = SO3(rvec.at<double>(0, 0), rvec.at<double>(1, 0), rvec.at<double>(2, 0)).matrix();
+    Eigen::Vector3d omega = Eigen::Vector3d(rvec.at<double>(0, 0), rvec.at<double>(1, 0), rvec.at<double>(2, 0));
+    Matrix3d rota = Sophus::SO3d::exp(omega).matrix();
 
 
     ROS_DEBUG_STREAM("-----------pnp-----------");
