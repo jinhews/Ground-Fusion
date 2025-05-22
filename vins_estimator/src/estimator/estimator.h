@@ -50,21 +50,10 @@
 #include <darknet_ros_msgs/CheckForObjectsAction.h>
 #include <darknet_ros_msgs/ObjectCount.h> //box
 
-// gnss new
-
-#include "../factor/gnss_psr_dopp_factor.hpp"
-#include "../factor/gnss_dt_ddt_factor.hpp"
-#include "../factor/gnss_dt_anchor_factor.hpp"
-#include "../factor/gnss_ddt_smooth_factor.hpp"
 #include "../factor/pos_vel_factor.hpp"
 #include "../factor/pose_anchor_factor.h"
-#include "../initial/gnss_vi_initializer.h"
 
 #include <opencv2/core/eigen.hpp>
-
-#include <gnss_comm/gnss_utility.hpp>
-#include <gnss_comm/gnss_ros.hpp>
-#include <gnss_comm/gnss_spp.hpp>
 
 struct RetriveData // line
 {
@@ -93,11 +82,6 @@ public:
     // line
     void optimizationwithLine();
     void onlyLineOpt();
-    // gnss new
-    void processGNSS(const std::vector<ObsPtr> &gnss_mea);
-    void inputEphem(EphemBasePtr ephem_ptr);
-    void inputIonoParams(double ts, const std::vector<double> &iono_params);
-    void inputGNSSTimeDiff(const double t_diff);
 
     // interface
     void initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r);
@@ -112,7 +96,6 @@ public:
     void processImagewithline(const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image, const double header, const map<int, vector<pair<int, Vector4d>>> &linefeature);
     void processMeasurements();
     void inputWheel(double t, const Vector3d &linearVelocity, const Vector3d &angularVelocity);
-    void inputGNSS(double t, std::vector<ObsPtr> meas_msg);
     void inputrawodom(double t, const Vector3d &wheel_xyz);
     // void inputGroundtruth(double t, Eigen::Matrix<double, 7, 1>& data);
     void processWheel(double t, double dt, const Vector3d &linear_velocity, const Vector3d &angular_velocity);
@@ -125,15 +108,11 @@ public:
     void fastPredictPureWheel(double t, Eigen::Vector3d linear_velocity, Eigen::Vector3d angular_velocity, Eigen::Vector3d &P, Eigen::Quaterniond &Q, Eigen::Vector3d &V);
     bool WheelAvailable(double t);
     void initPlane();
-    bool getGNSSInterval(double t0, double t1);
-    // bool GNSSAvailable(double t);
 
     // internal
     void clearState();
     bool initialStructure();
     bool visualInitialAlign();
-    bool GNSSVIAlign();
-    void updateGNSSStatistics();
 
     // bool visualInitialAlignWithDepth();
     bool relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l);
@@ -286,28 +265,15 @@ public:
     vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
 
-    // GNSS related
-    queue<pair<double, std::vector<ObsPtr>>> GNSSBuf;
-    std::vector<ObsPtr> gnss_msg;
-    std::mutex mGNSSBuf;
     bool first_optimization;
 
-    bool gnss_ready;
     Eigen::Vector3d anc_ecef;
     Eigen::Matrix3d R_ecef_enu;
     double yaw_enu_local;
-    std::vector<ObsPtr> gnss_meas_buf[(WINDOW_SIZE + 1)];
-    std::vector<EphemBasePtr> gnss_ephem_buf[(WINDOW_SIZE + 1)];
-    std::vector<double> latest_gnss_iono_params;
-    std::map<uint32_t, std::vector<EphemBasePtr>> sat2ephem;
-    std::map<uint32_t, std::map<double, size_t>> sat2time_index;
-    std::map<uint32_t, uint32_t> sat_track_status;
     double para_anc_ecef[3];
     double para_yaw_enu_local[1];
     double para_rcv_dt[(WINDOW_SIZE + 1) * 4];
     double para_rcv_ddt[WINDOW_SIZE + 1];
-    // GNSS statistics
-    double diff_t_gnss_local;
     Eigen::Matrix3d R_enu_local;
     Eigen::Vector3d ecef_pos, enu_pos, enu_vel, enu_ypr;
 

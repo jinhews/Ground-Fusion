@@ -12,7 +12,6 @@
 #include "../factor/pose_subset_parameterization.h"
 #include "../factor/orientation_subset_parameterization.h"
 
-#define MAX_GNSS_CAMERA_DELAY 0.1
 Estimator::Estimator() : f_manager{Rs}
 {
     ROS_INFO("init begins");
@@ -62,8 +61,6 @@ void Estimator::clearState()
         wheelVelBuf.pop();
     while (!wheelGyrBuf.empty())
         wheelGyrBuf.pop();
-    while (!GNSSBuf.empty())
-        GNSSBuf.pop();
 
     prevTime = -1;
     prevTime_wheel = -1;
@@ -104,9 +101,6 @@ void Estimator::clearState()
             delete pre_integrations_wheel[i];
         }
         pre_integrations_wheel[i] = nullptr;
-
-        if (GNSS_ENABLE)
-            gnss_meas_buf[i].clear();
     }
 
     for (int i = 0; i < NUM_OF_CAM; i++)
@@ -136,18 +130,10 @@ void Estimator::clearState()
         delete tmp_wheel_pre_integration;
     tmp_wheel_pre_integration = nullptr;
 
-    gnss_ready = false;
     anc_ecef.setZero();
     R_ecef_enu.setIdentity();
     para_yaw_enu_local[0] = 0;
     yaw_enu_local = 0;
-    sat2ephem.clear();
-    sat2time_index.clear();
-    sat_track_status.clear();
-    latest_gnss_iono_params.clear();
-    std::copy(GNSS_IONO_DEFAULT_PARAMS.begin(), GNSS_IONO_DEFAULT_PARAMS.end(),
-              std::back_inserter(latest_gnss_iono_params));
-    diff_t_gnss_local = 0;
 
     first_optimization = true;
 
@@ -394,15 +380,6 @@ void Estimator::inputrawodom(double t, const Vector3d &wheel_xyz) // new
     mRawodomBuf.unlock();
 }
 
-void Estimator::inputGNSS(double t, std::vector<ObsPtr> meas_msg) // new
-{
-    mGNSSBuf.lock();
-    GNSSBuf.push(make_pair(t, meas_msg));
-    // cout<<"push gnss here"<<endl;
-
-    mGNSSBuf.unlock();
-}
-
 bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                                vector<pair<double, Eigen::Vector3d>> &gyrVector)
 {
@@ -470,42 +447,6 @@ bool Estimator::getWheelInterval(double t0, double t1, vector<pair<double, Eigen
         return false;
     }
     //    ROS_INFO("velVector.size: %d", static_cast<int>(velVector.size()));
-    return true;
-}
-
-bool Estimator::getGNSSInterval(double t0, double t1) // gnss new
-{
-    if (GNSSBuf.empty())
-    {
-        // printf("not receive GNSS\n");
-        return false;
-    }
-    // printf("get imu from %f %f\n", t0, t1);
-    // printf("imu front time %f   imu end time %f\n", wheelVelBuf.front().first, wheelVelBuf.back().first);
-
-    // time2sec(gnss_meas[0]->time)
-    // GNSSBuf.front().first
-
-    while (!GNSSBuf.empty() && time2sec(GNSSBuf.front().second[0]->time) < t1 + diff_t_gnss_local - MAX_GNSS_CAMERA_DELAY)
-    {
-
-        ROS_WARN("throw gnss, only should happen at the beginning");
-        GNSSBuf.pop();
-        if (GNSSBuf.empty())
-            return false;
-        // front_gnss_ts = time2sec(gnss_meas_buf.front()[0]->time);
-    }
-    if (GNSSBuf.empty())
-    {
-        ROS_WARN("wait for gnss...");
-        return false;
-    }
-    else // if (abs(front_gnss_ts-t1-diff_t_gnss_local) < MAX_GNSS_CAMERA_DELAY)
-    {
-
-        gnss_msg = GNSSBuf.front().second;
-        GNSSBuf.pop();
-    }
     return true;
 }
 
@@ -581,10 +522,6 @@ void Estimator::processMeasurements()
             {
                 linefeatureBuf.pop();
             }
-            if (GNSS_ENABLE)
-            {
-                getGNSSInterval(prevTime, curTime);
-            }
             mBuf.unlock();
             mWheelBuf.lock();
             if (USE_WHEEL)
@@ -653,11 +590,6 @@ void Estimator::processMeasurements()
                     preintegrationstationary = false;
             }
 
-            if (GNSS_ENABLE && !gnss_msg.empty())
-            {
-
-                processGNSS(gnss_msg);
-            }
             // line
             if (USE_LINE)
             {
@@ -942,24 +874,12 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                     solver_flag = NON_LINEAR;
                     optimization();
 
-                    if (GNSS_ENABLE) // gnss new
-                    {
-                        if (!gnss_ready)
-                        {
-                            gnss_ready = GNSSVIAlign();
-                        }
-                        if (gnss_ready)
-                        {
-                            updateGNSSStatistics();
-                        }
-                    }
-
                     slideWindow();
                     ROS_INFO("Initialization finish!");
                 }
                 else
                 {
-                    optimization(); // no need to gnss vi align
+                    optimization();
                     slideWindow();
                     updateLatestStates();
                 }
@@ -1010,18 +930,6 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                     solver_flag = NON_LINEAR;
 
                     optimization();
-
-                    if (GNSS_ENABLE) // gnss new
-                    {
-                        if (!gnss_ready)
-                        {
-                            gnss_ready = GNSSVIAlign();
-                        }
-                        if (gnss_ready)
-                        {
-                            updateGNSSStatistics();
-                        }
-                    }
 
                     slideWindow();
                     // ROS_WARN("Visual Initialization finish!");
@@ -1110,17 +1018,6 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         }
 
         optimization();
-        if (GNSS_ENABLE)
-        {
-            if (!gnss_ready)
-            {
-                gnss_ready = GNSSVIAlign();
-            }
-            if (gnss_ready)
-            {
-                updateGNSSStatistics();
-            }
-        }
         if (!USE_MCC)
         {
             set<int> removeIndex;
@@ -1423,115 +1320,6 @@ void Estimator::processImagewithline(const map<int, vector<pair<int, Eigen::Matr
         last_P0 = Ps[0];
         updateLatestStates();
     }
-}
-
-// gnss new
-void Estimator::inputEphem(EphemBasePtr ephem_ptr)
-{
-    double toe = time2sec(ephem_ptr->toe);
-    // if a new ephemeris comes
-    if (sat2time_index.count(ephem_ptr->sat) == 0 || sat2time_index.at(ephem_ptr->sat).count(toe) == 0)
-    {
-        sat2ephem[ephem_ptr->sat].emplace_back(ephem_ptr);
-        sat2time_index[ephem_ptr->sat].emplace(toe, sat2ephem.at(ephem_ptr->sat).size() - 1);
-    }
-}
-
-void Estimator::inputIonoParams(double ts, const std::vector<double> &iono_params)
-{
-    if (iono_params.size() != 8)
-        return;
-
-    // update ionosphere parameters
-    latest_gnss_iono_params.clear();
-    std::copy(iono_params.begin(), iono_params.end(), std::back_inserter(latest_gnss_iono_params));
-}
-
-void Estimator::inputGNSSTimeDiff(const double t_diff)
-{
-    diff_t_gnss_local = t_diff;
-}
-
-void Estimator::processGNSS(const std::vector<ObsPtr> &gnss_meas)
-{
-    // cout<<"here2"<<endl;
-    std::vector<ObsPtr> valid_meas;
-    std::vector<EphemBasePtr> valid_ephems;
-    for (auto obs : gnss_meas)
-    {
-        // filter according to system
-        uint32_t sys = satsys(obs->sat, NULL);
-        if (sys != SYS_GPS && sys != SYS_GLO && sys != SYS_GAL && sys != SYS_BDS)
-            continue;
-
-        // if not got cooresponding ephemeris yet
-        if (sat2ephem.count(obs->sat) == 0)
-            continue;
-
-        if (obs->freqs.empty())
-            continue; // no valid signal measurement
-        int freq_idx = -1;
-        L1_freq(obs, &freq_idx);
-        if (freq_idx < 0)
-            continue; // no L1 observation
-
-        double obs_time = time2sec(obs->time);
-        std::map<double, size_t> time2index = sat2time_index.at(obs->sat);
-        double ephem_time = EPH_VALID_SECONDS;
-        size_t ephem_index = -1;
-        for (auto ti : time2index)
-        {
-            if (std::abs(ti.first - obs_time) < ephem_time)
-            {
-                ephem_time = std::abs(ti.first - obs_time);
-                ephem_index = ti.second;
-            }
-        }
-        if (ephem_time >= EPH_VALID_SECONDS)
-        {
-            cerr << "ephemeris not valid anymore\n";
-            continue;
-        }
-        const EphemBasePtr &best_ephem = sat2ephem.at(obs->sat).at(ephem_index);
-
-        // filter by tracking status
-        LOG_IF(FATAL, freq_idx < 0) << "No L1 observation found.\n";
-        if (obs->psr_std[freq_idx] > GNSS_PSR_STD_THRES ||
-            obs->dopp_std[freq_idx] > GNSS_DOPP_STD_THRES)
-        {
-            sat_track_status[obs->sat] = 0;
-            continue;
-        }
-        else
-        {
-            if (sat_track_status.count(obs->sat) == 0)
-                sat_track_status[obs->sat] = 0;
-            ++sat_track_status[obs->sat];
-        }
-        if (sat_track_status[obs->sat] < GNSS_TRACK_NUM_THRES)
-            continue; // not being tracked for enough epochs
-
-        // filter by elevation angle
-        if (gnss_ready)
-        {
-            Eigen::Vector3d sat_ecef;
-            if (sys == SYS_GLO)
-                sat_ecef = geph2pos(obs->time, std::dynamic_pointer_cast<GloEphem>(best_ephem), NULL);
-            else
-                sat_ecef = eph2pos(obs->time, std::dynamic_pointer_cast<Ephem>(best_ephem), NULL);
-            double azel[2] = {0, M_PI / 2.0};
-            sat_azel(ecef_pos, sat_ecef, azel);
-            if (azel[1] < GNSS_ELEVATION_THRES * M_PI / 180.0)
-                continue;
-        }
-        valid_meas.push_back(obs);
-        valid_ephems.push_back(best_ephem);
-    }
-    cout << "valid satellite num:" << valid_meas.size() << endl; //<<endl<<endl<<endl;
-   
-
-    gnss_meas_buf[frame_count] = valid_meas;
-    gnss_ephem_buf[frame_count] = valid_ephems;
 }
 
 void Estimator::initPlane()
@@ -1925,135 +1713,6 @@ bool Estimator::visualInitialAlign()
     return true;
 }
 
-bool Estimator::GNSSVIAlign()
-{
-
-    // if (solver_flag == INITIAL )//&& is_imu_excited == false) // visual-inertial not initialized
-    //     return false;
-
-    if (is_imu_excited == false && solver_flag == INITIAL)
-    {
-        cout << "perform gnss vi align: imu not excited or initial" << endl;
-        return false;
-    }
-
-    if (gnss_ready) // GNSS-VI already initialized
-    {
-        cout << "perform gnss vi align: gnss already true" << endl;
-        return true;
-    }
-
-    // for (uint32_t i = 0; i < (WINDOW_SIZE+1); ++i)
-    // {
-    //     if (gnss_meas_buf[i].empty() )
-    //     //if (gnss_meas_buf[i].empty() || gnss_meas_buf[i].size() < 2)
-    //         return false;
-    // }
-
-    // check horizontal velocity excitation
-    Eigen::Vector2d avg_hor_vel(0.0, 0.0);
-    for (uint32_t i = 0; i < (WINDOW_SIZE + 1); ++i)
-        avg_hor_vel += Vs[i].head<2>().cwiseAbs();
-    avg_hor_vel /= (WINDOW_SIZE + 1);
-    if (avg_hor_vel.norm() < 0.3)
-    {
-        std::cerr << "velocity excitation not enough for GNSS-VI alignment.\n";
-        return false;
-    }
-
-    std::vector<std::vector<ObsPtr>> curr_gnss_meas_buf;
-    std::vector<std::vector<EphemBasePtr>> curr_gnss_ephem_buf;
-    for (uint32_t i = 0; i < (WINDOW_SIZE + 1); ++i)
-    {
-        curr_gnss_meas_buf.push_back(gnss_meas_buf[i]);
-        curr_gnss_ephem_buf.push_back(gnss_ephem_buf[i]);
-    }
-
-    GNSSVIInitializer gnss_vi_initializer(curr_gnss_meas_buf, curr_gnss_ephem_buf, latest_gnss_iono_params);
-
-    // 1. get a rough global location
-    Eigen::Matrix<double, 7, 1> rough_xyzt;
-    rough_xyzt.setZero();
-    if (!gnss_vi_initializer.coarse_localization(rough_xyzt))
-    {
-        std::cerr << "Fail to obtain a coarse location.\n";
-        return false;
-    }
-    // cout << "rough xyzt" << rough_xyzt << endl
-    //      << endl
-    //      << endl;
-
-    // 2. perform yaw alignment
-    std::vector<Eigen::Vector3d> local_vs;
-    for (uint32_t i = 0; i < (WINDOW_SIZE + 1); ++i)
-        local_vs.push_back(Vs[i]);
-    Eigen::Vector3d rough_anchor_ecef = rough_xyzt.head<3>();
-    double aligned_yaw = 0;
-    double aligned_rcv_ddt = 0;
-    if (!gnss_vi_initializer.yaw_alignment(local_vs, rough_anchor_ecef, aligned_yaw, aligned_rcv_ddt))
-    {
-        std::cerr << "Fail to align ENU and local frames.\n";
-        return false;
-    }
-    std::cout << "aligned_yaw is " << aligned_yaw * 180.0 / M_PI << '\n';
-
-    // 3. perform anchor refinement
-    std::vector<Eigen::Vector3d> local_ps;
-    for (uint32_t i = 0; i < (WINDOW_SIZE + 1); ++i)
-        local_ps.push_back(Ps[i]);
-    Eigen::Matrix<double, 7, 1> refined_xyzt;
-    refined_xyzt.setZero();
-    if (!gnss_vi_initializer.anchor_refinement(local_ps, aligned_yaw,
-                                               aligned_rcv_ddt, rough_xyzt, refined_xyzt))
-    {
-        std::cerr << "Fail to refine anchor point.\n";
-        return false;
-    }
-    // std::cout << "refined anchor point is " << std::setprecision(20)
-    //           << refined_xyzt.head<3>().transpose() << '\n';
-
-    // restore GNSS states
-    uint32_t one_observed_sys = static_cast<uint32_t>(-1);
-    for (uint32_t k = 0; k < 4; ++k)
-    {
-        if (rough_xyzt(k + 3) != 0)
-        {
-            one_observed_sys = k;
-            break;
-        }
-    }
-    for (uint32_t i = 0; i < (WINDOW_SIZE + 1); ++i)
-    {
-        para_rcv_ddt[i] = aligned_rcv_ddt;
-        for (uint32_t k = 0; k < 4; ++k)
-        {
-            if (rough_xyzt(k + 3) == 0)
-                para_rcv_dt[i * 4 + k] = refined_xyzt(3 + one_observed_sys) + aligned_rcv_ddt * i;
-            else
-                para_rcv_dt[i * 4 + k] = refined_xyzt(3 + k) + aligned_rcv_ddt * i;
-        }
-    }
-    anc_ecef = refined_xyzt.head<3>();
-    R_ecef_enu = ecef2rotation(anc_ecef);
-
-    yaw_enu_local = aligned_yaw;
-    ROS_WARN("GNSS VI Align ok!");
-
-    return true;
-}
-
-void Estimator::updateGNSSStatistics()
-{
-    R_enu_local = Eigen::AngleAxisd(yaw_enu_local, Eigen::Vector3d::UnitZ());
-    // cout<<"yaw enu local:"<<yaw_enu_local<<endl;
-    enu_pos = R_enu_local * Ps[WINDOW_SIZE];
-    enu_vel = R_enu_local * Vs[WINDOW_SIZE];
-    enu_ypr = Utility::R2ypr(R_enu_local * Rs[WINDOW_SIZE]);
-    // cout<<"enu_pos:"<<std::setprecision(9)<<enu_pos<<endl;
-    // cout<<"anc ecef pos"<<anc_ecef<<endl;
-    ecef_pos = anc_ecef + R_ecef_enu * enu_pos;
-    // cout<<"trajectory ecef_pos:"<<std::setprecision(9)<<anc_ecef<<endl;
-}
 bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
 {
     // find previous frame which contians enough correspondance and parallex with newest frame
@@ -2344,12 +2003,6 @@ void Estimator::vector2double()
 
     para_Td[0][0] = td;
     para_Td_wheel[0][0] = td_wheel;
-    if (gnss_ready)
-    {
-        para_yaw_enu_local[0] = yaw_enu_local;
-        for (uint32_t k = 0; k < 3; ++k)
-            para_anc_ecef[k] = anc_ecef(k);
-    }
 }
 
 void Estimator::vector2doubleline()
@@ -2559,13 +2212,6 @@ void Estimator::double2vector()
     if (USE_IMU)
         td = para_Td[0][0];
 
-    if (gnss_ready) // gnss new
-    {
-        yaw_enu_local = para_yaw_enu_local[0];
-        for (uint32_t k = 0; k < 3; ++k)
-            anc_ecef(k) = para_anc_ecef[k];
-        R_ecef_enu = ecef2rotation(anc_ecef);
-    }
 }
 
 void Estimator::double2vectorline()
@@ -2901,55 +2547,6 @@ void Estimator::optimization()
     // loss_function = new ceres::CauchyLoss(1.0 / FOCAL_LENGTH);
     // ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
 
-    if (gnss_ready) // gnss new
-    {
-        problem.AddParameterBlock(para_yaw_enu_local, 1);
-        Eigen::Vector2d avg_hor_vel(0.0, 0.0);
-        for (uint32_t i = 0; i <= WINDOW_SIZE; ++i)
-            avg_hor_vel += Vs[i].head<2>().cwiseAbs();
-        avg_hor_vel /= (WINDOW_SIZE + 1);
-        // cerr << "avg_hor_vel is " << avg_vel << endl;
-        if (avg_hor_vel.norm() < 0.3) // org 0.3
-        {
-            // std::cerr << "velocity excitation not enough, fix yaw angle.\n";
-            // problem.SetParameterBlockConstant(para_yaw_enu_local);
-            cout << "too small velocity, fix yaw angle" << endl;
-            lowspeed = true;
-        }
-        else
-            lowspeed = false;
-
-        // for (uint32_t i = 0; i <= WINDOW_SIZE; ++i)
-        // {
-        //     if (gnss_meas_buf[i].size() < 10) // org 10
-        //     {
-        //         problem.SetParameterBlockConstant(para_yaw_enu_local);
-        //         cout << "gnss meas < 10, fix yaw angle" << endl;
-        //     }
-        // }
-        problem.SetParameterBlockConstant(para_yaw_enu_local);
-
-        problem.AddParameterBlock(para_anc_ecef, 3);
-        // problem.SetParameterBlockConstant(para_anc_ecef);
-
-        for (uint32_t i = 0; i <= WINDOW_SIZE; ++i)
-        {
-            for (uint32_t k = 0; k < 4; ++k)
-                problem.AddParameterBlock(para_rcv_dt + i * 4 + k, 1);
-            problem.AddParameterBlock(para_rcv_ddt + i, 1);
-        }
-    }
-
-    if (first_optimization && GNSS_ENABLE) // gnss new
-    {
-        std::vector<double> anchor_value;
-        for (uint32_t k = 0; k < 7; ++k)
-            anchor_value.push_back(para_Pose[0][k]);
-        PoseAnchorFactor *pose_anchor_factor = new PoseAnchorFactor(anchor_value);
-        problem.AddResidualBlock(pose_anchor_factor, NULL, para_Pose[0]);
-        first_optimization = false;
-    }
-
     for (int i = 0; i < frame_count + 1; i++)
     {
         ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
@@ -3175,60 +2772,6 @@ void Estimator::optimization()
         }
     }
 
-    if (gnss_ready and !lowspeed) // gnss new
-    {
-        // if (!lowspeed){
-        {
-            for (int i = 0; i <= WINDOW_SIZE; ++i)
-            {
-                // cerr << "size of gnss_meas_buf[" << i << "] is " << gnss_meas_buf[i].size() << endl;
-                const std::vector<ObsPtr> &curr_obs = gnss_meas_buf[i];
-                const std::vector<EphemBasePtr> &curr_ephem = gnss_ephem_buf[i];
-
-                for (uint32_t j = 0; j < curr_obs.size(); ++j)
-                {
-                    const uint32_t sys = satsys(curr_obs[j]->sat, NULL);
-                    const uint32_t sys_idx = gnss_comm::sys2idx.at(sys);
-
-                    int lower_idx = -1;
-                    const double obs_local_ts = time2sec(curr_obs[j]->time) - diff_t_gnss_local;
-                    if (Headers[i] > obs_local_ts)
-                        lower_idx = (i == 0 ? 0 : i - 1);
-                    else
-                        lower_idx = (i == WINDOW_SIZE ? WINDOW_SIZE - 1 : i);
-                    const double lower_ts = Headers[lower_idx];
-                    const double upper_ts = Headers[lower_idx + 1];
-
-                    const double ts_ratio = (upper_ts - obs_local_ts) / (upper_ts - lower_ts);
-                    GnssPsrDoppFactor *gnss_factor = new GnssPsrDoppFactor(curr_obs[j],
-                                                                           curr_ephem[j], latest_gnss_iono_params, ts_ratio);
-                    problem.AddResidualBlock(gnss_factor, NULL, para_Pose[lower_idx],
-                                             para_SpeedBias[lower_idx], para_Pose[lower_idx + 1], para_SpeedBias[lower_idx + 1],
-                                             para_rcv_dt + i * 4 + sys_idx, para_rcv_ddt + i, para_yaw_enu_local, para_anc_ecef);
-                }
-            }
-        }
-
-        // build relationship between rcv_dt and rcv_ddt
-        for (size_t k = 0; k < 4; ++k)
-        {
-            for (uint32_t i = 0; i < WINDOW_SIZE; ++i)
-            {
-                const double gnss_dt = Headers[i + 1] - Headers[i];
-                DtDdtFactor *dt_ddt_factor = new DtDdtFactor(gnss_dt);
-                problem.AddResidualBlock(dt_ddt_factor, NULL, para_rcv_dt + i * 4 + k,
-                                         para_rcv_dt + (i + 1) * 4 + k, para_rcv_ddt + i, para_rcv_ddt + i + 1);
-            }
-        }
-
-        // add rcv_ddt smooth factor
-        for (int i = 0; i < WINDOW_SIZE; ++i)
-        {
-            DdtSmoothFactor *ddt_smooth_factor = new DdtSmoothFactor(GNSS_DDT_WEIGHT);
-            problem.AddResidualBlock(ddt_smooth_factor, NULL, para_rcv_ddt + i, para_rcv_ddt + i + 1);
-        }
-    }
-
     // new stationary
     if (systemstationary && stationary_detect)
     {
@@ -3395,45 +2938,6 @@ void Estimator::optimization()
         //     marginalization_info->addResidualBlockInfo(residual_block_info);
         // }
 
-        if (gnss_ready) // gnss new
-        {
-            for (uint32_t j = 0; j < gnss_meas_buf[0].size(); ++j)
-            {
-                const uint32_t sys = satsys(gnss_meas_buf[0][j]->sat, NULL);
-                const uint32_t sys_idx = gnss_comm::sys2idx.at(sys);
-
-                const double obs_local_ts = time2sec(gnss_meas_buf[0][j]->time) - diff_t_gnss_local;
-                const double lower_ts = Headers[0];
-                const double upper_ts = Headers[1];
-                const double ts_ratio = (upper_ts - obs_local_ts) / (upper_ts - lower_ts);
-
-                GnssPsrDoppFactor *gnss_factor = new GnssPsrDoppFactor(gnss_meas_buf[0][j],
-                                                                       gnss_ephem_buf[0][j], latest_gnss_iono_params, ts_ratio);
-                ResidualBlockInfo *psr_dopp_residual_block_info = new ResidualBlockInfo(gnss_factor, NULL,
-                                                                                        vector<double *>{para_Pose[0], para_SpeedBias[0], para_Pose[1],
-                                                                                                         para_SpeedBias[1], para_rcv_dt + sys_idx, para_rcv_ddt,
-                                                                                                         para_yaw_enu_local, para_anc_ecef},
-                                                                                        vector<int>{0, 1, 4, 5});
-                marginalization_info->addResidualBlockInfo(psr_dopp_residual_block_info);
-            }
-
-            const double gnss_dt = Headers[1] - Headers[0]; // duplicate parameter block
-            for (size_t k = 0; k < 4; ++k)
-            {
-                DtDdtFactor *dt_ddt_factor = new DtDdtFactor(gnss_dt);
-                ResidualBlockInfo *dt_ddt_residual_block_info = new ResidualBlockInfo(dt_ddt_factor, NULL,
-                                                                                      vector<double *>{para_rcv_dt + k, para_rcv_dt + 4 + k, para_rcv_ddt, para_rcv_ddt + 1},
-                                                                                      vector<int>{0, 2});
-                marginalization_info->addResidualBlockInfo(dt_ddt_residual_block_info);
-            }
-
-            // margin rcv_ddt smooth factor Null pointer passed to AddParameterBlock for a parameter with size 1
-            DdtSmoothFactor *ddt_smooth_factor = new DdtSmoothFactor(GNSS_DDT_WEIGHT);
-            ResidualBlockInfo *ddt_smooth_residual_block_info = new ResidualBlockInfo(ddt_smooth_factor, NULL,
-                                                                                      vector<double *>{para_rcv_ddt, para_rcv_ddt + 1}, vector<int>{0});
-            marginalization_info->addResidualBlockInfo(ddt_smooth_residual_block_info);
-        }
-
         {
             int feature_index = -1;
             for (auto &it_per_id : f_manager.feature)
@@ -3520,11 +3024,6 @@ void Estimator::optimization()
         addr_shift[reinterpret_cast<long>(para_plane_Z[0])] = para_plane_Z[0];
 
         addr_shift[reinterpret_cast<long>(para_Td_wheel[0])] = para_Td_wheel[0];
-        if (GNSS_ENABLE)
-        {
-            addr_shift[reinterpret_cast<long>(para_yaw_enu_local)] = para_yaw_enu_local;
-            addr_shift[reinterpret_cast<long>(para_anc_ecef)] = para_anc_ecef;
-        }
 
         vector<double *> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift);
 
@@ -3616,12 +3115,6 @@ void Estimator::optimization()
             addr_shift[reinterpret_cast<long>(para_Td[0])] = para_Td[0];
             addr_shift[reinterpret_cast<long>(para_Td_wheel[0])] = para_Td_wheel[0];
 
-            if (GNSS_ENABLE)
-            {
-                addr_shift[reinterpret_cast<long>(para_yaw_enu_local)] = para_yaw_enu_local;
-                addr_shift[reinterpret_cast<long>(para_anc_ecef)] = para_anc_ecef;
-            }
-
             vector<double *> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift);
             if (last_marginalization_info)
                 delete last_marginalization_info;
@@ -3671,14 +3164,6 @@ void Estimator::slideWindow()
                     angular_velocity_buf_wheel[i].swap(angular_velocity_buf_wheel[i + 1]);
                 }
 
-                if (GNSS_ENABLE)
-                {
-                    gnss_meas_buf[i].swap(gnss_meas_buf[i + 1]);
-                    gnss_ephem_buf[i].swap(gnss_ephem_buf[i + 1]);
-                    for (uint32_t k = 0; k < 4; ++k)
-                        para_rcv_dt[i * 4 + k] = para_rcv_dt[(i + 1) * 4 + k];
-                    para_rcv_ddt[i] = para_rcv_ddt[i + 1];
-                }
             }
             Headers[WINDOW_SIZE] = Headers[WINDOW_SIZE - 1];
             Ps[WINDOW_SIZE] = Ps[WINDOW_SIZE - 1];
@@ -3696,11 +3181,6 @@ void Estimator::slideWindow()
                 dt_buf[WINDOW_SIZE].clear();
                 linear_acceleration_buf[WINDOW_SIZE].clear();
                 angular_velocity_buf[WINDOW_SIZE].clear();
-            }
-            if (GNSS_ENABLE) // gnss new
-            {
-                gnss_meas_buf[WINDOW_SIZE].clear();
-                gnss_ephem_buf[WINDOW_SIZE].clear();
             }
             if (USE_WHEEL)
             {
@@ -3758,14 +3238,6 @@ void Estimator::slideWindow()
                 linear_acceleration_buf[WINDOW_SIZE].clear();
                 angular_velocity_buf[WINDOW_SIZE].clear();
             }
-            // GNSS related
-            gnss_meas_buf[frame_count - 1] = gnss_meas_buf[frame_count];
-            gnss_ephem_buf[frame_count - 1] = gnss_ephem_buf[frame_count];
-            for (uint32_t k = 0; k < 4; ++k)
-                para_rcv_dt[(frame_count - 1) * 4 + k] = para_rcv_dt[frame_count * 4 + k];
-            para_rcv_ddt[frame_count - 1] = para_rcv_ddt[frame_count];
-            gnss_meas_buf[frame_count].clear();
-            gnss_ephem_buf[frame_count].clear();
 
             if (USE_WHEEL)
             {

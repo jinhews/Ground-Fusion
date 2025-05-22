@@ -26,17 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   darknet_ros_msgs
 
   nodelet
-
-  # gnss new
-  rosbag
   message_generation
-  gnss_comm
-)
-
-# gnss new
-add_message_files(
-  DIRECTORY msg
-  FILES LocalSensorExternalTrigger.msg
 )
 
 # Define path of darknet folder here.
@@ -312,14 +302,8 @@ add_library(vins_lib
   src/factor/line_parameterization.cpp
   src/factor/projection_factor.cpp # new
 
-  # gnss new
-  src/factor/gnss_psr_dopp_factor.cpp
-  src/factor/gnss_dt_ddt_factor.cpp
-  src/factor/gnss_dt_anchor_factor.cpp
-  src/factor/gnss_ddt_smooth_factor.cpp
   src/factor/pos_vel_factor.cpp
   src/factor/pose_anchor_factor.cpp
-  src/initial/gnss_vi_initializer.cpp
 )
 target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} /usr/local/lib/libSophus.so fmt)
 
