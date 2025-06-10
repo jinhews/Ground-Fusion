@@ -21,12 +21,6 @@
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
-// bounding box
-#include <darknet_ros_msgs/BoundingBox.h>
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/CheckForObjectsAction.h>
-#include <darknet_ros_msgs/ObjectCount.h>
-
 #include <condition_variable>
 Estimator estimator;
 
@@ -36,7 +30,6 @@ queue<sensor_msgs::ImuConstPtr> imu_buf;
 queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
-queue<darknet_ros_msgs::BoundingBoxesConstPtr> boxes_buf;
 std::mutex m_buf;
 
 vector<Vector4d> vio_xyzt_buf;
@@ -67,13 +60,6 @@ void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
     m_buf.unlock();
 }
 
-void box_callback(const darknet_ros_msgs::BoundingBoxesConstPtr &boxes_msg)
-{
-    m_buf.lock();
-    boxes_buf.push(boxes_msg);
-
-    m_buf.unlock();
-}
 void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg) // new
 {
 
@@ -247,89 +233,11 @@ void sync_process()
             cv::Mat image0, image1;
             std_msgs::Header header;
             double time = 0;
-            darknet_ros_msgs::BoundingBoxesConstPtr backboxes, boxes;
             m_buf.lock();
 
             if (USE_YOLO)
             {
 
-                if (!img0_buf.empty() && !img1_buf.empty())
-                {
-                    double time0 = img0_buf.front()->header.stamp.toSec();
-                    double time1 = img1_buf.front()->header.stamp.toSec();
-                    if (time0 < time1 - 0.003)
-                    {
-                        img0_buf.pop();
-                        printf("throw img0\n");
-                    }
-                    else if (time0 > time1 + 0.003)
-                    {
-                        img1_buf.pop();
-                        printf("throw img1\n");
-                    }
-                    else // img0 and img1 match
-                    {
-                        time = img0_buf.front()->header.stamp.toSec();
-                        header = img0_buf.front()->header;
-                        image0 = getImageFromMsg(img0_buf.front());
-                        image1 = getDepthImageFromMsg(img1_buf.front());
-                        // img0_buf.pop();
-
-                        double backboxtime = 0, boxtime = 0;
-                        // cout<<"boxes buf size:"<<boxes_buf.size()<<endl;
-                        if (!boxes_buf.empty())
-                        {
-                            backboxes = boxes_buf.back();
-                            backboxtime = backboxes->image_header.stamp.toSec();
-                            if (backboxtime < time)
-                            { // cout<<"<"<<endl<<endl;
-                                // continue;//if会卡死
-                                // sleep(0.1);  //实测，用while等待，buf不会更新
-                                backboxes = boxes_buf.back();
-                                backboxtime = backboxes->image_header.stamp.toSec();
-                                // cout << setprecision(19) << "backbox time:" << backboxtime << " time:" << time << endl;
-                            }
-                        }
-                        if ((backboxtime < time) && syncflag == 1)
-                        {
-                            syncflag = 0;
-                            // cout<<"restart sync"<<endl;
-                        }
-                        if ((backboxtime > time || backboxtime == time) && syncflag == 0)
-                        {
-                            syncflag = 1;
-                            // cout<<"success!"<<endl;//已经成功输出！
-                            // cout << setprecision(19) << "backbox time:" << backboxtime << " time:" << time << endl;
-                            // break;
-                        }
-                        if (syncflag && !boxes_buf.empty())
-                        {
-                            boxes = boxes_buf.front();
-                            boxtime = boxes->image_header.stamp.toSec();
-                            while (boxtime < time && !boxes_buf.empty())
-                            {
-                                boxes = boxes_buf.front();
-                                boxtime = boxes->image_header.stamp.toSec();
-                                boxes_buf.pop();
-                            }
-                            if (boxtime == time)
-                            {
-                                // cout<<"666"<<endl;
-                                // cout << setprecision(19) << "backbox time:" << boxtime << " time:" << time << endl;
-                                matchflag = 1;
-                                // break;
-                            }
-                        }
-
-                        if (syncflag)
-                        {
-                            img0_buf.pop();
-                            img1_buf.pop();
-                        }
-
-                        // printf("find img0 and img1\n");
-                    }
-                }
             }
             else // org
             {
@@ -381,7 +289,6 @@ void sync_process()
                 {
                     if (USE_YOLO && syncflag && matchflag)
                     {
-                        estimator.inputImagebox(time, boxes, image0, image1); // here
                     }
                     else
                     {
@@ -393,7 +300,6 @@ void sync_process()
         else // mono case
         {
             cv::Mat image;
-            darknet_ros_msgs::BoundingBoxesConstPtr backboxes, boxes;
             std_msgs::Header header;
             double time = 0;
             m_buf.lock();
@@ -403,60 +309,8 @@ void sync_process()
                 header = img0_buf.front()->header;
                 image = getImageFromMsg(img0_buf.front());
 
-                if (USE_YOLO)
-                {
-                    double backboxtime = 0, boxtime = 0;
-                    // cout<<"boxes buf size:"<<boxes_buf.size()<<endl;
-                    if (!boxes_buf.empty())
-                    {
-                        backboxes = boxes_buf.back();
-                        backboxtime = backboxes->image_header.stamp.toSec();
-                        if (backboxtime < time)
-                        { // cout<<"<"<<endl<<endl;
-                            // continue;//if会卡死
-                            // sleep(0.1);  //实测，用while等待，buf不会更新
-                            backboxes = boxes_buf.back();
-                            backboxtime = backboxes->image_header.stamp.toSec();
-                            // cout << setprecision(19) << "backbox time:" << backboxtime << " time:" << time << endl;
-                        }
-                    }
-                    if ((backboxtime < time) && syncflag == 1)
-                    {
-                        syncflag = 0;
-                        // cout<<"restart sync"<<endl;
-                    }
-                    if ((backboxtime > time || backboxtime == time) && syncflag == 0)
-                    {
-                        syncflag = 1;
-
-                        // cout << setprecision(19) << "backbox time:" << backboxtime << " time:" << time << endl;
-                        // break;
-                    }
-                    if (syncflag && !boxes_buf.empty())
-                    {
-                        boxes = boxes_buf.front();
-                        boxtime = boxes->image_header.stamp.toSec();
-                        while (boxtime < time && !boxes_buf.empty())
-                        {
-                            boxes = boxes_buf.front();
-                            boxtime = boxes->image_header.stamp.toSec();
-                            boxes_buf.pop();
-                        }
-                        if (boxtime == time)
-                        {
-
-                            matchflag = 1;
-                        }
-                    }
-
-                } // use yolo
-
                 if (USE_YOLO == 1)
                 {
-                    if (syncflag)
-                    {
-                        img0_buf.pop();
-                    }
                 }
                 else if (USE_YOLO == 0)
                 {
@@ -467,27 +321,6 @@ void sync_process()
             m_buf.unlock();
             if (USE_YOLO)
             {
-                if (!image.empty() && syncflag) // 已经成功对齐时间戳
-                {
-
-                    if (USE_LINE)
-                    {
-                        estimator.inputImagewithline(time, image);
-                    }
-
-                    else
-                    {
-                        if (matchflag == 0)
-                        {
-                            estimator.inputImage(time, image);
-                        }
-
-                        else if (matchflag == 1)
-                        {
-                            estimator.inputImagebox(time, boxes, image);
-                        }
-                    }
-                }
             }
             else if (USE_YOLO == 0)
             {
@@ -603,7 +436,6 @@ int main(int argc, char **argv)
     // ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
     ros::Subscriber sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
-    ros::Subscriber sub_box = n.subscribe("/darknet_ros/bounding_boxes", 100, box_callback);
     // sleep(0.2);//for time sync
 
     std::thread sync_thread{sync_process};

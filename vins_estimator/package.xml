@@ -64,7 +64,6 @@
   <build_depend>cv_bridge</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>message_generation</build_depend>
-  <build_depend>darknet_ros_msgs</build_depend>
   <build_depend>actionlib</build_depend>
   <build_depend>nodelet</build_depend>
 
@@ -86,7 +85,6 @@
   <run_depend>cv_bridge</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>message_generation</run_depend>
-  <run_depend>darknet_ros_msgs</run_depend>
   <run_depend>actionlib</run_depend>
   <run_depend>nodelet</run_depend>
 

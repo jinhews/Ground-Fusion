@@ -27,11 +27,6 @@
 #include "../estimator/parameters.h"
 #include "../utility/tic_toc.h"
 
-#include <darknet_ros_msgs/BoundingBox.h>
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/CheckForObjectsAction.h>
-#include <darknet_ros_msgs/ObjectCount.h>//box
-
 using namespace std;
 using namespace camodocal;
 using namespace Eigen;
@@ -45,7 +40,6 @@ class FeatureTracker
 public:
     FeatureTracker();
     map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
-    map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> trackImagebox(double _cur_time, const darknet_ros_msgs::BoundingBoxesConstPtr &_boxes,const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void setMask();
     void addPoints();
     void readIntrinsicParameter(const vector<string> &calib_file,const int depth);
@@ -58,11 +52,6 @@ public:
     void showTwoImage(const cv::Mat &img1, const cv::Mat &img2, 
                       vector<cv::Point2f> pts1, vector<cv::Point2f> pts2);
     void drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight, 
-                                   vector<int> &curLeftIds,
-                                   vector<cv::Point2f> &curLeftPts, 
-                                   vector<cv::Point2f> &curRightPts,
-                                   map<int, cv::Point2f> &prevLeftPtsMap);
-    void drawTrackbox(const darknet_ros_msgs::BoundingBoxesConstPtr &_boxes,const cv::Mat &imLeft, const cv::Mat &imRight, 
                                    vector<int> &curLeftIds,
                                    vector<cv::Point2f> &curLeftPts, 
                                    vector<cv::Point2f> &curRightPts,

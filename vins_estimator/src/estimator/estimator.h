@@ -45,11 +45,6 @@
 #include "../factor/line_parameterization.h" //line
 #include "../factor/line_projection_factor.h"
 
-#include <darknet_ros_msgs/BoundingBox.h>
-#include <darknet_ros_msgs/BoundingBoxes.h>
-#include <darknet_ros_msgs/CheckForObjectsAction.h>
-#include <darknet_ros_msgs/ObjectCount.h> //box
-
 #include "../factor/pos_vel_factor.hpp"
 #include "../factor/pose_anchor_factor.h"
 
@@ -88,7 +83,6 @@ public:
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
     // void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
-    void inputImagebox(double t, const darknet_ros_msgs::BoundingBoxesConstPtr &_boxes, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void inputImagewithline(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image, const double header);

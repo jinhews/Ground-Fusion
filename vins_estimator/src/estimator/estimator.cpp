@@ -227,37 +227,6 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     }
 }
 
-void Estimator::inputImagebox(double t, const darknet_ros_msgs::BoundingBoxesConstPtr &_boxes, const cv::Mat &_img, const cv::Mat &_img1)
-{
-    inputImageCnt++;
-    map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> featureFrame;
-    TicToc featureTrackerTime;
-    if (_img1.empty())
-        featureFrame = featureTracker.trackImagebox(t, _boxes, _img);
-    else
-        featureFrame = featureTracker.trackImagebox(t, _boxes, _img, _img1);
-    // printf("featureTracker time: %f\n", featureTrackerTime.toc());
-
-    if (MULTIPLE_THREAD)
-    {
-        if (inputImageCnt % 2 == 0)
-        {
-            mBuf.lock();
-            featureBuf.push(make_pair(t, featureFrame));
-            mBuf.unlock();
-        }
-    }
-    else
-    {
-        mBuf.lock();
-        featureBuf.push(make_pair(t, featureFrame));
-        mBuf.unlock();
-        TicToc processTime;
-        processMeasurements();
-        printf("process time: %f\n", processTime.toc());
-    }
-}
-
 void Estimator::inputImagewithline(double t, const cv::Mat &_img, const cv::Mat &_img1)
 {
     inputImageCnt++;

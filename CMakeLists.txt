@@ -10,14 +10,6 @@ include_directories(camera_models/include/camodocal/camera_models)
 include_directories(camera_models/include/camodocal/chessboard)
 include_directories(camera_models/include/camodocal/gpl)
 include_directories(camera_models/include/camodocal/sparse_graph)
-include_directories(global_fusion/src)
-include_directories(global_fusion/ThirdParty/GeographicLib/include)
-include_directories(dense_map/src)
-include_directories(dense_map/src/ThirdParty)
-include_directories(dense_map/src/ThirdParty/DBoW)
-include_directories(dense_map/src/ThirdParty/DUtils)
-include_directories(dense_map/src/ThirdParty/DVision)
-include_directories(dense_map/src/utility)
 include_directories(vins_estimator/src/estimator)
 include_directories(vins_estimator/src/factor)
 include_directories(vins_estimator/src/featureTracker)
@@ -25,93 +17,6 @@ include_directories(vins_estimator/src/initial)
 include_directories(vins_estimator/src/utility)
 
 add_executable(VINS_Fusion
-        camera_models/camera_calib_example/calibrationdata/left-0000.png
-        camera_models/camera_calib_example/calibrationdata/left-0001.png
-        camera_models/camera_calib_example/calibrationdata/left-0002.png
-        camera_models/camera_calib_example/calibrationdata/left-0003.png
-        camera_models/camera_calib_example/calibrationdata/left-0004.png
-        camera_models/camera_calib_example/calibrationdata/left-0005.png
-        camera_models/camera_calib_example/calibrationdata/left-0006.png
-        camera_models/camera_calib_example/calibrationdata/left-0007.png
-        camera_models/camera_calib_example/calibrationdata/left-0008.png
-        camera_models/camera_calib_example/calibrationdata/left-0009.png
-        camera_models/camera_calib_example/calibrationdata/left-0010.png
-        camera_models/camera_calib_example/calibrationdata/left-0011.png
-        camera_models/camera_calib_example/calibrationdata/left-0012.png
-        camera_models/camera_calib_example/calibrationdata/left-0013.png
-        camera_models/camera_calib_example/calibrationdata/left-0014.png
-        camera_models/camera_calib_example/calibrationdata/left-0015.png
-        camera_models/camera_calib_example/calibrationdata/left-0016.png
-        camera_models/camera_calib_example/calibrationdata/left-0017.png
-        camera_models/camera_calib_example/calibrationdata/left-0018.png
-        camera_models/camera_calib_example/calibrationdata/left-0019.png
-        camera_models/camera_calib_example/calibrationdata/left-0020.png
-        camera_models/camera_calib_example/calibrationdata/left-0021.png
-        camera_models/camera_calib_example/calibrationdata/left-0022.png
-        camera_models/camera_calib_example/calibrationdata/left-0023.png
-        camera_models/camera_calib_example/calibrationdata/left-0024.png
-        camera_models/camera_calib_example/calibrationdata/left-0025.png
-        camera_models/camera_calib_example/calibrationdata/left-0026.png
-        camera_models/camera_calib_example/calibrationdata/left-0027.png
-        camera_models/camera_calib_example/calibrationdata/left-0028.png
-        camera_models/camera_calib_example/calibrationdata/left-0029.png
-        camera_models/camera_calib_example/calibrationdata/left-0030.png
-        camera_models/camera_calib_example/calibrationdata/left-0031.png
-        camera_models/camera_calib_example/calibrationdata/left-0032.png
-        camera_models/camera_calib_example/calibrationdata/left-0033.png
-        camera_models/camera_calib_example/calibrationdata/left-0034.png
-        camera_models/camera_calib_example/calibrationdata/left-0035.png
-        camera_models/camera_calib_example/calibrationdata/left-0036.png
-        camera_models/camera_calib_example/calibrationdata/left-0037.png
-        camera_models/camera_calib_example/calibrationdata/left-0038.png
-        camera_models/camera_calib_example/calibrationdata/left-0039.png
-        camera_models/camera_calib_example/calibrationdata/left-0040.png
-        camera_models/camera_calib_example/calibrationdata/left-0041.png
-        camera_models/camera_calib_example/calibrationdata/left-0042.png
-        camera_models/camera_calib_example/calibrationdata/left-0043.png
-        camera_models/camera_calib_example/calibrationdata/left-0044.png
-        camera_models/camera_calib_example/calibrationdata/left-0045.png
-        camera_models/camera_calib_example/calibrationdata/left-0046.png
-        camera_models/camera_calib_example/calibrationdata/left-0047.png
-        camera_models/camera_calib_example/calibrationdata/left-0048.png
-        camera_models/camera_calib_example/calibrationdata/left-0049.png
-        camera_models/camera_calib_example/calibrationdata/left-0050.png
-        camera_models/camera_calib_example/calibrationdata/left-0051.png
-        camera_models/camera_calib_example/calibrationdata/left-0052.png
-        camera_models/camera_calib_example/calibrationdata/left-0053.png
-        camera_models/camera_calib_example/calibrationdata/left-0054.png
-        camera_models/camera_calib_example/calibrationdata/left-0055.png
-        camera_models/camera_calib_example/calibrationdata/left-0056.png
-        camera_models/camera_calib_example/calibrationdata/left-0057.png
-        camera_models/camera_calib_example/calibrationdata/left-0058.png
-        camera_models/camera_calib_example/calibrationdata/left-0059.png
-        camera_models/camera_calib_example/calibrationdata/left-0060.png
-        camera_models/camera_calib_example/calibrationdata/left-0061.png
-        camera_models/camera_calib_example/calibrationdata/left-0062.png
-        camera_models/camera_calib_example/calibrationdata/left-0063.png
-        camera_models/camera_calib_example/calibrationdata/left-0064.png
-        camera_models/camera_calib_example/calibrationdata/left-0065.png
-        camera_models/camera_calib_example/calibrationdata/left-0066.png
-        camera_models/camera_calib_example/calibrationdata/left-0067.png
-        camera_models/camera_calib_example/calibrationdata/left-0068.png
-        camera_models/camera_calib_example/calibrationdata/left-0069.png
-        camera_models/camera_calib_example/calibrationdata/left-0070.png
-        camera_models/camera_calib_example/calibrationdata/left-0071.png
-        camera_models/camera_calib_example/calibrationdata/left-0072.png
-        camera_models/camera_calib_example/calibrationdata/left-0073.png
-        camera_models/camera_calib_example/calibrationdata/left-0074.png
-        camera_models/camera_calib_example/calibrationdata/left-0075.png
-        camera_models/camera_calib_example/calibrationdata/left-0076.png
-        camera_models/camera_calib_example/calibrationdata/left-0077.png
-        camera_models/camera_calib_example/calibrationdata/left-0078.png
-        camera_models/camera_calib_example/calibrationdata/left-0079.png
-        camera_models/camera_calib_example/calibrationdata/left-0080.png
-        camera_models/camera_calib_example/calibrationdata/left-0081.png
-        camera_models/camera_calib_example/calibrationdata/left-0082.png
-        camera_models/camera_calib_example/calibrationdata/left-0083.png
-        camera_models/camera_calib_example/calibrationdata/left-0084.png
-        camera_models/camera_calib_example/readme.txt
-        camera_models/cmake/FindEigen.cmake
         camera_models/include/camodocal/calib/CameraCalibration.h
         camera_models/include/camodocal/camera_models/Camera.h
         camera_models/include/camodocal/camera_models/CameraFactory.h
@@ -191,75 +96,6 @@ add_executable(VINS_Fusion
         config/fisheye_mask.jpg
         config/fisheye_mask_752x480.jpg
         config/vins_rviz_config.rviz
-        global_fusion/models/car.dae
-        global_fusion/models/hummingbird.mesh
-        global_fusion/src/Factors.h
-        global_fusion/src/globalOpt.cpp
-        global_fusion/src/globalOpt.h
-        global_fusion/src/globalOptNode.cpp
-        global_fusion/src/tic_toc.h
-        global_fusion/ThirdParty/GeographicLib/include/Config.h
-        global_fusion/ThirdParty/GeographicLib/include/Constants.hpp
-        global_fusion/ThirdParty/GeographicLib/include/Geocentric.hpp
-        global_fusion/ThirdParty/GeographicLib/include/LocalCartesian.hpp
-        global_fusion/ThirdParty/GeographicLib/include/Math.hpp
-        global_fusion/ThirdParty/GeographicLib/src/Geocentric.cpp
-        global_fusion/ThirdParty/GeographicLib/src/LocalCartesian.cpp
-        global_fusion/ThirdParty/GeographicLib/src/Math.cpp
-        global_fusion/CMakeLists.txt
-        global_fusion/package.xml
-        dense_map/cmake/FindEigen.cmake
-        dense_map/src/ThirdParty/DBoW/BowVector.cpp
-        dense_map/src/ThirdParty/DBoW/BowVector.h
-        dense_map/src/ThirdParty/DBoW/DBoW2.h
-        dense_map/src/ThirdParty/DBoW/FBrief.cpp
-        dense_map/src/ThirdParty/DBoW/FBrief.h
-        dense_map/src/ThirdParty/DBoW/FClass.h
-        dense_map/src/ThirdParty/DBoW/FeatureVector.cpp
-        dense_map/src/ThirdParty/DBoW/FeatureVector.h
-        dense_map/src/ThirdParty/DBoW/QueryResults.cpp
-        dense_map/src/ThirdParty/DBoW/QueryResults.h
-        dense_map/src/ThirdParty/DBoW/ScoringObject.cpp
-        dense_map/src/ThirdParty/DBoW/ScoringObject.h
-        dense_map/src/ThirdParty/DBoW/TemplatedDatabase.h
-        dense_map/src/ThirdParty/DBoW/TemplatedVocabulary.h
-        dense_map/src/ThirdParty/DUtils/DException.h
-        dense_map/src/ThirdParty/DUtils/DUtils.h
-        dense_map/src/ThirdParty/DUtils/Random.cpp
-        dense_map/src/ThirdParty/DUtils/Random.h
-        dense_map/src/ThirdParty/DUtils/Timestamp.cpp
-        dense_map/src/ThirdParty/DUtils/Timestamp.h
-        dense_map/src/ThirdParty/DVision/BRIEF.cpp
-        dense_map/src/ThirdParty/DVision/BRIEF.h
-        dense_map/src/ThirdParty/DVision/DVision.h
-        dense_map/src/ThirdParty/VocabularyBinary.cpp
-        dense_map/src/ThirdParty/VocabularyBinary.hpp
-        dense_map/src/utility/CameraPoseVisualization.cpp
-        dense_map/src/utility/CameraPoseVisualization.h
-        dense_map/src/utility/tic_toc.h
-        dense_map/src/utility/utility.cpp
-        dense_map/src/utility/utility.h
-        dense_map/src/keyframe.cpp
-        dense_map/src/keyframe.h
-        dense_map/src/parameters.h
-        dense_map/src/pose_graph.cpp
-        dense_map/src/pose_graph.h
-        dense_map/src/pose_graph_node.cpp
-        dense_map/CMakeLists.txt
-        dense_map/package.xml
-        support_files/image/car.png
-        support_files/image/car_gif.gif
-        support_files/image/euroc.gif
-        support_files/image/kitti.gif
-        support_files/image/kitti.png
-        support_files/image/kitti_rank.png
-        support_files/image/vins.png
-        support_files/image/vins_black.png
-        support_files/image/vins_logo.png
-        "support_files/paper/VINS-Mono: A Robust and Versatile Monocular\nVisual-Inertial State Estimator.pdf"
-        support_files/brief_k10L6.bin
-        support_files/brief_pattern.yml
-        support_files/paper_bib.txt
         vins_estimator/cmake/FindEigen.cmake
         vins_estimator/launch/vins_rviz.launch
         vins_estimator/src/estimator/estimator.cpp
